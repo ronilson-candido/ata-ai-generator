@@ -43,6 +43,11 @@ class MinuteBase(BaseModel):
 class MinuteCreate(MinuteBase):
     pass
 
+# Transcrição em tempo real (sem arquivo)
+class LiveTranscriptionCreate(BaseModel):
+    title: str
+    transcription: str
+
 class MinuteInDB(MinuteBase):
     id: int
     user_id: int

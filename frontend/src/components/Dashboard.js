@@ -55,12 +55,20 @@ function Dashboard({ user, onLogout }) {
               <p className="subtitle">Sistema de Transcrição e Geração de Atas com IA</p>
             </div>
           </div>
-          <button 
-            onClick={() => navigate('/upload')} 
-            className="cyber-button"
-          >
-            + NOVA ATA
-          </button>
+          <div className="dashboard-actions">
+            <button 
+              onClick={() => navigate('/live')} 
+              className="cyber-button-secondary"
+            >
+              AO VIVO
+            </button>
+            <button 
+              onClick={() => navigate('/upload')} 
+              className="cyber-button"
+            >
+              + NOVA ATA
+            </button>
+          </div>
         </div>
 
         <div className="stats-grid grid-3">

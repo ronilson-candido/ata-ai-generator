@@ -8,6 +8,7 @@ import AdminDashboard from './components/AdminDashboard';
 import UploadMinute from './components/UploadMinute';
 import History from './components/History';
 import MinuteDetail from './components/MinuteDetail';
+import LiveTranscription from './components/LiveTranscription';
 import { authService } from './services/api';
 
 function App() {
@@ -67,6 +68,9 @@ function App() {
           } />
           <Route path="/history" element={
             user ? <History user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
+          } />
+          <Route path="/live" element={
+            user ? <LiveTranscription user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
           } />
           <Route path="/minute/:id" element={
             user ? <MinuteDetail user={user} onLogout={handleLogout} /> : <Navigate to="/login" />

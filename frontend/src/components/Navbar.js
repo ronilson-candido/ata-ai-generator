@@ -12,7 +12,8 @@ function Navbar({ user, onLogout }) {
 
         <div className="navbar-menu">
           <Link to="/dashboard" className="nav-link">Dashboard</Link>
-          <Link to="/upload" className="nav-link">Nova Ata</Link>
+          <Link to="/live" className="nav-link">Reunião em Tempo Real</Link>
+          <Link to="/upload" className="nav-link">Reunião Gravada</Link>
           <Link to="/history" className="nav-link">Histórico</Link>
           {user.is_admin && (
             <Link to="/admin" className="nav-link admin-link">Admin</Link>

@@ -78,6 +78,11 @@ export const minutesService = {
   async deleteMinute(id) {
     const response = await api.delete(`/minutes/${id}`);
     return response.data;
+  },
+
+  async saveLiveTranscription(title, transcription) {
+    const response = await api.post('/minutes/live', { title, transcription });
+    return response.data;
   }
 };
 

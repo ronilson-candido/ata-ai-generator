@@ -18,6 +18,11 @@
   flex-wrap: wrap;
 }
 
+.dashboard-actions {
+  display: flex;
+  gap: 12px;
+}
+
 .dashboard-title-section {
   display: flex;
   align-items: center;
