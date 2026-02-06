@@ -26,12 +26,12 @@
 .dashboard-title-section {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 24px;
   flex: 1;
 }
 
 .dashboard-logo {
-  height: 80px;
+  height: 120px;
   width: auto;
   object-fit: contain;
   transition: all 0.3s ease;

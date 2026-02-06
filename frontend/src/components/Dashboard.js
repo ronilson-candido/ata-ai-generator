@@ -52,7 +52,7 @@ function Dashboard({ user, onLogout }) {
             <img src="/logo.svg" alt="Cyber Lab" className="dashboard-logo" />
             <div>
               <h1 className="glow-text">BEM-VINDO, {user.username.toUpperCase()}</h1>
-              <p className="subtitle">Sistema de Transcrição e Geração de Atas com IA</p>
+              <p className="subtitle">Sistema de Transcrição e Geração de Atas com IA do Laboratorio Cyber</p>
             </div>
           </div>
           <div className="dashboard-actions">
