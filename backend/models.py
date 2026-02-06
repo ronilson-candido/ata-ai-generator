@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Float, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from backend.database import Base
@@ -25,9 +25,11 @@ class Minute(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String, nullable=False)
     original_filename = Column(String)
+    audio_path = Column(String) 
     file_size = Column(Float)  # MB
     audio_duration = Column(Float)  # seconds
     transcription = Column(Text)
+    segments = Column(JSON)  
     structured_minutes = Column(Text)
     processing_time = Column(Float)  # seconds
     created_at = Column(DateTime(timezone=True), server_default=func.now())

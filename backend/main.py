@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from typing import List
+import os
 import uvicorn
 
 from backend.database import engine, get_db
@@ -44,4 +45,5 @@ def health_check():
     return {"status": "healthy"}
 
 if __name__ == "__main__":
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
+    reload_enabled = os.environ.get("UVICORN_RELOAD", "0") == "1"
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=reload_enabled)

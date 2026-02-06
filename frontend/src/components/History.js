@@ -75,7 +75,7 @@ function History({ user, onLogout }) {
           <input
             type="text"
             className="cyber-input"
-            placeholder="🔍 Buscar por título ou arquivo..."
+            placeholder="Buscar por título ou arquivo..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -95,7 +95,7 @@ function History({ user, onLogout }) {
         ) : (
           <>
             <div className="results-count">
-              <span>{filteredMinutes.length} ata{filteredMinutes.length !== 1 ? 's' : ''} encontrada{filteredMinutes.length !== 1 ? 's' : ''}</span>
+              <span>{filteredMinutes.length} {filteredMinutes.length === 1 ? 'ata encontrada' : 'atas encontradas'}</span>
             </div>
 
             <div className="minutes-list">
@@ -109,32 +109,32 @@ function History({ user, onLogout }) {
                   <div className="minute-item-header">
                     <div className="minute-title-section">
                       <h3>{minute.title}</h3>
-                      <span className="minute-date">📅 {formatDate(minute.created_at)}</span>
+                      <span className="minute-date">{formatDate(minute.created_at)}</span>
                     </div>
                     <button
                       className="delete-btn"
                       onClick={(e) => handleDelete(minute.id, e)}
                       title="Excluir ata"
                     >
-                      🗑️
+                      Excluir
                     </button>
                   </div>
 
                   <div className="minute-item-details">
                     <div className="detail-item">
-                      <span className="detail-icon">📁</span>
+                      <span className="detail-label">Arquivo:</span>
                       <span className="detail-text">{minute.original_filename}</span>
                     </div>
                     <div className="detail-item">
-                      <span className="detail-icon">⏱️</span>
-                      <span className="detail-text">Duração: {Math.round(minute.audio_duration)}s</span>
+                      <span className="detail-label">Duração:</span>
+                      <span className="detail-text">{Math.round(minute.audio_duration)}s</span>
                     </div>
                     <div className="detail-item">
-                      <span className="detail-icon">⚡</span>
-                      <span className="detail-text">Processamento: {Math.round(minute.processing_time)}s</span>
+                      <span className="detail-label">Processamento:</span>
+                      <span className="detail-text">{Math.round(minute.processing_time)}s</span>
                     </div>
                     <div className="detail-item">
-                      <span className="detail-icon">💾</span>
+                      <span className="detail-label">Tamanho:</span>
                       <span className="detail-text">{minute.file_size?.toFixed(2)} MB</span>
                     </div>
                   </div>

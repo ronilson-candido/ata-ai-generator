@@ -64,9 +64,7 @@ docker-compose up -d --build
 ### Tornar usuário admin (opcional)
 
 ```bash
-docker exec -it cyberlab_postgres psql -U cyber -d cyberlab
-UPDATE users SET is_admin = true WHERE username = 'seu_usuario';
-\q
+docker exec -it cyberlab_postgres psql -U cyber -d cyberlab -c "UPDATE users SET is_admin = true WHERE username = 'seu_usuario';"
 ```
 
 ## 👥 Funcionalidades

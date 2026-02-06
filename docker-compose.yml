@@ -28,11 +28,27 @@ services:
     environment:
       DATABASE_URL: postgresql://cyber:cyberpass123@postgres:5432/cyberlab
       PYTHONUNBUFFERED: 1
+      # Modelo Whisper: tiny, base, small, medium, large-v2
+      # large-v2 = melhor qualidade (requer mais RAM/GPU)
+      # medium = equilíbrio qualidade/velocidade
+      # small = rápido e boa qualidade (RECOMENDADO)
+      # base = mais rápido mas menos preciso
+      WHISPER_MODEL: ${WHISPER_MODEL:-small}
+      # 1 = modo rápido (melhor tempo), 0 = modo qualidade
+      WHISPER_SPEED_MODE: ${WHISPER_SPEED_MODE:-1}
+      WHISPER_BEAM_SIZE: ${WHISPER_BEAM_SIZE:-1}
+      WHISPER_BEST_OF: ${WHISPER_BEST_OF:-1}
+      WHISPER_TEMPERATURE: ${WHISPER_TEMPERATURE:-0.0}
+      # Token HuggingFace para diarização (identificação de locutores)
+      # Obtenha em: https://huggingface.co/settings/tokens
+      HF_TOKEN: ${HF_TOKEN:-}
+      PYANNOTE_TOKEN: ${PYANNOTE_TOKEN:-}
     volumes:
       - .:/app
       - ./models:/app/models
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
+      - whisper_cache:/root/.cache/whisper
     ports:
       - "8000:8000"
     depends_on:
@@ -68,3 +84,4 @@ networks:
 
 volumes:
   postgres_data:
+  whisper_cache:

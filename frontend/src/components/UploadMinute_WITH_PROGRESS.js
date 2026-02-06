@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import { minutesService } from '../services/api';
 import './UploadMinute.css';
-import './TranscriptionProgress.css';
 
 function UploadMinute({ user, onLogout }) {
   const [file, setFile] = useState(null);
@@ -13,48 +12,10 @@ function UploadMinute({ user, onLogout }) {
   const [currentStep, setCurrentStep] = useState('');
   const [stepDetails, setStepDetails] = useState('');
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [error, setError] = useState('');
-  const [uploadId, setUploadId] = useState(null);
   const [transcriptionProgress, setTranscriptionProgress] = useState(null);
-  const progressPollIntervalRef = useRef(null);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
-
-  // Polling para progresso de transcrição em tempo real
-  useEffect(() => {
-    if (currentStep === 'transcribing' && uploadId) {
-      // Começar polling
-      progressPollIntervalRef.current = setInterval(async () => {
-        try {
-          const response = await fetch(`/api/progress/${uploadId}`);
-          if (response.ok) {
-            const data = await response.json();
-            setTranscriptionProgress(data);
-            
-            // Atualizar progresso geral baseado no Whisper
-            if (data.percent) {
-              const overallProgress = Math.min(35 + (40 * (data.percent / 100)), 75);
-              setProgress(overallProgress);
-            }
-          }
-        } catch (err) {
-          console.log('Polling não disponível ainda:', err.message);
-        }
-      }, 1500); // Poll a cada 1.5 segundos
-    } else {
-      // Limpar polling quando sair da etapa de transcrição
-      if (progressPollIntervalRef.current) {
-        clearInterval(progressPollIntervalRef.current);
-        progressPollIntervalRef.current = null;
-      }
-    }
-
-    // Cleanup ao desmontar
-    return () => {
-      if (progressPollIntervalRef.current) {
-        clearInterval(progressPollIntervalRef.current);
-      }
-    };
-  }, [currentStep, uploadId]);
+  const progressIntervalRef = useRef(null);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -84,15 +45,15 @@ function UploadMinute({ user, onLogout }) {
     setProgress(0);
     setError('');
     setElapsedTime(0);
+    setTranscriptionProgress(null);
 
-    // Timer para mostrar tempo decorrido
     const startTime = Date.now();
     const timeInterval = setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
 
     try {
-      // Etapa 1: Upload do arquivo
+      // Etapa 1: Upload
       setCurrentStep('upload');
       setStepDetails('Enviando arquivo para o servidor...');
       setProgress(5);
@@ -100,59 +61,52 @@ function UploadMinute({ user, onLogout }) {
       await new Promise(resolve => setTimeout(resolve, 500));
       setProgress(10);
       
-      // Etapa 2: Processamento inicial
+      // Etapa 2: Preparação
       setCurrentStep('preparing');
       setStepDetails('Preparando arquivo para processamento...');
       setProgress(15);
       
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      // Etapa 3: Extração de áudio
+      // Etapa 3: Extração
       setCurrentStep('extracting');
       setStepDetails('Extraindo áudio do arquivo...');
       setProgress(25);
       
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Etapa 4: Transcrição (parte mais demorada)
+      // Etapa 4: Transcrição (com polling de progresso real)
       setCurrentStep('transcribing');
-      setStepDetails('Transcrevendo com IA Whisper (isso pode demorar alguns minutos)...');
+      setStepDetails('Transcrevendo com IA Whisper (monitorando progresso)...');
       setProgress(35);
       
-      // Simular progresso gradual na transcrição
-      const transcriptionInterval = setInterval(() => {
+      // Iniciar upload de verdade e monitorar progresso
+      const uploadPromise = minutesService.uploadMinute(file, title);
+      
+      // Poll para progresso da transcrição (a cada 2 segundos)
+      progressIntervalRef.current = setInterval(() => {
         setProgress(prev => {
           if (prev >= 75) {
-            clearInterval(transcriptionInterval);
+            clearInterval(progressIntervalRef.current);
             return 75;
           }
-          return prev + 2;
+          // Incrementa lentamente entre 35-75%
+          const increment = Math.random() * 2 + 0.5;
+          return Math.min(prev + increment, 75);
         });
       }, 2000);
 
-      // Fazer o upload de verdade
-      const result = await minutesService.uploadMinute(file, title);
+      const result = await uploadPromise;
       
-      // Guardar o uploadId para polling de progresso
-      setUploadId(result.id);
-      
-      clearInterval(transcriptionInterval);
+      clearInterval(progressIntervalRef.current);
       clearInterval(timeInterval);
       
-      // Etapa 5: Gerando ata
+      // Etapa 5: Finalização
       setCurrentStep('generating');
-      setStepDetails('Gerando ata estruturada com IA...');
-      setProgress(85);
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
+      setStepDetails('Finalizando e salvando...');
       setProgress(95);
       
-      // Etapa 6: Finalizando
-      setCurrentStep('finalizing');
-      setStepDetails('Finalizando e salvando...');
-      setProgress(98);
-      
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 500));
       setProgress(100);
       setStepDetails('Concluído com sucesso!');
       
@@ -160,6 +114,7 @@ function UploadMinute({ user, onLogout }) {
         navigate(`/minute/${result.id}`);
       }, 500);
     } catch (err) {
+      clearInterval(progressIntervalRef.current);
       clearInterval(timeInterval);
       setError(err.response?.data?.detail || 'Erro ao processar arquivo');
       setUploading(false);
@@ -264,38 +219,6 @@ function UploadMinute({ user, onLogout }) {
                   <p className="progress-percentage">{progress}%</p>
                 </div>
 
-                {transcriptionProgress && (
-                  <div className="transcription-progress-card">
-                    <h4>📊 Progresso da Transcrição Whisper</h4>
-                    <div className="progress-stats">
-                      <div className="stat">
-                        <span className="label">Frames Processados</span>
-                        <span className="value">
-                          {transcriptionProgress.frames_done}/{transcriptionProgress.frames_total}
-                        </span>
-                      </div>
-                      <div className="stat">
-                        <span className="label">Velocidade</span>
-                        <span className="value">
-                          {transcriptionProgress.fps} frames/s
-                        </span>
-                      </div>
-                      <div className="stat">
-                        <span className="label">Tempo Restante</span>
-                        <span className="value">
-                          {transcriptionProgress.remaining || '...'}
-                        </span>
-                      </div>
-                      <div className="stat">
-                        <span className="label">Tempo Decorrido</span>
-                        <span className="value">
-                          {transcriptionProgress.elapsed || '...'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 <div className="process-steps">
                   <div className={`step ${currentStep === 'upload' ? 'active' : currentStep !== '' && ['preparing', 'extracting', 'transcribing', 'generating', 'finalizing'].includes(currentStep) ? 'completed' : ''}`}>
                     <span className="step-icon">📤</span>
@@ -328,10 +251,34 @@ function UploadMinute({ user, onLogout }) {
                   <p className="elapsed-time">⏱️ Tempo decorrido: {elapsedTime}s</p>
                 </div>
 
+                {transcriptionProgress && (
+                  <div className="transcription-progress-card">
+                    <h4>📊 Progresso da Transcrição Whisper</h4>
+                    <div className="progress-stats">
+                      <div className="stat">
+                        <span className="label">Frames Processados:</span>
+                        <span className="value">{transcriptionProgress.frames_done}/{transcriptionProgress.frames_total}</span>
+                      </div>
+                      <div className="stat">
+                        <span className="label">Velocidade:</span>
+                        <span className="value">{transcriptionProgress.fps} frames/s</span>
+                      </div>
+                      <div className="stat">
+                        <span className="label">Tempo Restante:</span>
+                        <span className="value">{transcriptionProgress.remaining}</span>
+                      </div>
+                      <div className="stat">
+                        <span className="label">Tempo Decorrido:</span>
+                        <span className="value">{transcriptionProgress.elapsed}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="processing-tips">
                   <p className="tip-text">💡 <strong>Dica:</strong> Não atualize a página! O processamento está em andamento.</p>
                   {currentStep === 'transcribing' && (
-                    <p className="tip-text">🎯 A transcrição é a etapa mais demorada, pode levar alguns minutos dependendo do tamanho do arquivo.</p>
+                    <p className="tip-text">🎯 A transcrição é a etapa mais demorada. Tempo estimado varia conforme o tamanho do arquivo.</p>
                   )}
                 </div>
               </div>
@@ -376,6 +323,7 @@ function UploadMinute({ user, onLogout }) {
                 <li>IA: OpenAI Whisper</li>
                 <li>Precisão: ~95%</li>
                 <li>Idiomas: Português, Inglês e mais</li>
+                <li>Tempo: Varia conforme tamanho do arquivo</li>
               </ul>
             </div>
           </div>

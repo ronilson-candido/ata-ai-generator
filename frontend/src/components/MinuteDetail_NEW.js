@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import { minutesService } from '../services/api';
@@ -9,6 +9,10 @@ function MinuteDetail({ user, onLogout }) {
   const [minute, setMinute] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('ata');
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [activeSegment, setActiveSegment] = useState(null);
+  const audioRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -19,12 +23,46 @@ function MinuteDetail({ user, onLogout }) {
     try {
       const data = await minutesService.getMinute(id);
       setMinute(data);
+      
+      // Se tem áudio, carregar URL
+      if (data.audio_path) {
+        const audioUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:8000/api'}/minutes/${id}/audio`;
+        setAudioUrl(audioUrl);
+      }
     } catch (error) {
       console.error('Error loading minute:', error);
       navigate('/history');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAudioTimeUpdate = () => {
+    if (audioRef.current) {
+      const time = audioRef.current.currentTime;
+      setCurrentTime(time);
+      
+      // Encontrar segmento ativo baseado no tempo atual
+      if (minute?.segments) {
+        const active = minute.segments.find(seg => 
+          time >= seg.start && time <= seg.end
+        );
+        setActiveSegment(active);
+      }
+    }
+  };
+
+  const handleSegmentClick = (segment) => {
+    if (audioRef.current && segment) {
+      audioRef.current.currentTime = segment.start;
+      audioRef.current.play();
+    }
+  };
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const downloadMarkdown = () => {
@@ -90,6 +128,33 @@ function MinuteDetail({ user, onLogout }) {
           <p className="detail-date">Gerado em {formatDate(minute.created_at)}</p>
         </div>
 
+        {/* Player de Áudio */}
+        {audioUrl && (
+          <div className="audio-player-section cyber-card">
+            <h3>🎵 Áudio da Reunião</h3>
+            <div className="audio-player-controls">
+              <audio
+                ref={audioRef}
+                src={audioUrl}
+                controls
+                onTimeUpdate={handleAudioTimeUpdate}
+                className="audio-player"
+              />
+              <div className="audio-info">
+                <span className="current-time">{formatTime(currentTime)}</span>
+                <span className="separator">/</span>
+                <span className="total-time">{formatTime(minute.audio_duration || 0)}</span>
+              </div>
+            </div>
+            {activeSegment && (
+              <div className="current-segment-display">
+                <p className="segment-label">🎙️ Falando agora:</p>
+                <p className="segment-text">"{activeSegment.text}"</p>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="detail-stats grid-4">
           <div className="stat-item cyber-card">
             <span className="stat-label">Arquivo</span>
@@ -123,6 +188,14 @@ function MinuteDetail({ user, onLogout }) {
             >
               TRANSCRIÇÃO COMPLETA
             </button>
+            {minute.segments && minute.segments.length > 0 && (
+              <button
+                className={`tab-btn ${activeTab === 'timeline' ? 'active' : ''}`}
+                onClick={() => setActiveTab('timeline')}
+              >
+                LINHA DO TEMPO
+              </button>
+            )}
           </div>
 
           {activeTab === 'ata' ? (
@@ -137,7 +210,7 @@ function MinuteDetail({ user, onLogout }) {
                 <pre>{minute.structured_minutes}</pre>
               </div>
             </div>
-          ) : (
+          ) : activeTab === 'transcricao' ? (
             <div className="content-panel cyber-card">
               <div className="panel-header">
                 <h2>Transcrição Completa</h2>
@@ -147,6 +220,37 @@ function MinuteDetail({ user, onLogout }) {
               </div>
               <div className="transcription-content">
                 <p>{minute.transcription}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="content-panel cyber-card">
+              <div className="panel-header">
+                <h2>Linha do Tempo com Minutagem</h2>
+                <p className="timeline-hint">💡 Clique em qualquer trecho para ouvir o áudio daquele momento</p>
+              </div>
+              <div className="timeline-content">
+                {minute.segments && minute.segments.map((segment, index) => (
+                  <div
+                    key={index}
+                    className={`timeline-segment ${activeSegment?.start === segment.start ? 'active' : ''}`}
+                    onClick={() => handleSegmentClick(segment)}
+                  >
+                    <div className="segment-time">
+                      <span className="time-badge">{formatTime(segment.start)}</span>
+                      <span className="time-separator">→</span>
+                      <span className="time-badge">{formatTime(segment.end)}</span>
+                    </div>
+                    <div className="segment-text-content">
+                      <p>{segment.text}</p>
+                    </div>
+                    {activeSegment?.start === segment.start && (
+                      <div className="playing-indicator">
+                        <span className="playing-icon">▶️</span>
+                        <span>Reproduzindo</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}

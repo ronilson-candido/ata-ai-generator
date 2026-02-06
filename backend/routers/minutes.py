@@ -1,18 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List
 import tempfile
 import os
 import time
+import shutil
+import threading
 
 from backend import models, schemas, auth
 from backend.database import get_db
 from audio_processor import extract_audio_from_video, get_audio_duration
-from transcription_ai import transcribe_audio
+from transcription_ai import transcribe_audio, transcribe_with_speakers
 from minutes_generator import generate_structured_minutes
 from backend.diarization import diarize_audio
+import config
 
 router = APIRouter()
+
+# Armazenar progresso de transcrição por minute_id
+upload_progress = {}
 
 
 def _seconds_to_mmss(value: float) -> str:
@@ -105,28 +112,90 @@ async def create_minute(
         duration = get_audio_duration(audio_path)
         print(f"Duração: {duration}s")
         
-        # Transcribe (com segmentos para alinhamento de locutor)
+        # Criar ID temporário para progresso (será atualizado com ID real após salvar no DB)
+        temp_progress_id = f"{current_user.id}_{int(time.time() * 1000)}"
+        
+        # Usar um thread separado para simular progresso durante a transcrição
+        # (Enquanto não conseguimos capturar tqdm do Whisper em tempo real)
+        def simulate_progress(progress_id, duration_estimate=300):
+            start = time.time()
+            elapsed_time = 0
+            frames_total = 119793  # Valor default para ~20min de áudio
+            
+            # Verificar duração real do áudio
+            if duration > 0:
+                frames_total = int(duration * 100)  # ~100 frames por segundo (approximate)
+            
+            while elapsed_time < duration_estimate:
+                # Progressão quadrática lenta no início, rápida no meio, lenta no final
+                progress_ratio = elapsed_time /duration_estimate
+                if progress_ratio <0.1:
+                    percent = int(progress_ratio * 10)  # 0-1%
+                elif progress_ratio < 0.9:
+                    percent = int(10 + (progress_ratio - 0.1) * 88.9)  # 1-99%
+                else:
+                    percent = int(99 + (progress_ratio - 0.9) * 10)  # 99-100%
+                
+                frames_done = int(frames_total * (percent / 100))
+                fps = frames_done / (elapsed_time + 1) if elapsed_time > 0 else 0
+                
+                minutes_remaining = (duration_estimate - elapsed_time) // 60
+                seconds_remaining = int((duration_estimate - elapsed_time) % 60)
+                remaining_str = f"{int(minutes_remaining):02d}:{seconds_remaining:02d}"
+                
+                minutes_elapsed = int(elapsed_time) // 60
+                seconds_elapsed = int(elapsed_time) % 60
+                elapsed_str = f"{minutes_elapsed:02d}:{seconds_elapsed:02d}"
+                
+                if progress_id in upload_progress or percent < 100:
+                    upload_progress[progress_id] = {
+                        'status': 'transcribing',
+                        'percent': percent,
+                        'frames_done': frames_done,
+                        'frames_total': frames_total,
+                        'elapsed': elapsed_str,
+                        'remaining': remaining_str,
+                        'fps': f"{fps:.2f}"
+                    }
+                
+                time.sleep(3)  # Atualizar a cada 3 segundos
+                elapsed_time = time.time() - start
+        
+        # Iniciar thread de progresso
+        progress_thread = threading.Thread(
+            target=simulate_progress,
+            args=(temp_progress_id, duration * 2),  # Estimativa de tempo (duração 2x para transcrição)
+            daemon=True
+        )
+        progress_thread.start()
+        
+        # Transcrever
         print("Iniciando transcrição...")
         start_time = time.time()
-        transcription, whisper_segments = transcribe_audio(audio_path, with_segments=True)
+        
+        # Usar transcrição com timestamps e locutores se diarização estiver ativa
+        transcription_display = None  # Para guardar a versão com timestamps
+        
+        if diarize:
+            print("Modo: Transcrição com timestamps e locutores (diarização)")
+            formatted_transcription, transcription_data = transcribe_with_speakers(audio_path, with_diarization=True)
+            transcription = transcription_data.get("transcription", formatted_transcription)
+            whisper_segments = transcription_data.get("segments", [])
+            
+            # Guardar a transcrição formatada com timestamps para a aba de transcrição completa
+            transcription_display = "## Transcrição com Timestamps e Locutores\n\n" + formatted_transcription
+        else:
+            print("Modo: Transcrição simples (sem diarização)")
+            transcription, whisper_segments = transcribe_audio(audio_path, with_segments=True)
+            transcription_display = transcription
+        
         processing_time = time.time() - start_time
         print(f"Transcrição concluída em {processing_time}s")
         print(f"Resultado ({len(transcription)} chars): {transcription[:100] if transcription else '(vazio)'}...")
 
-        # Diarização offline (opcional)
-        timeline_md = ""
-        if diarize:
-            diar_segments = diarize_audio(audio_path)
-            aligned = _align_speakers(whisper_segments or [], diar_segments)
-            timeline_md = _format_timeline(aligned)
-            if timeline_md:
-                timeline_md = "\n\n## 6. Minutagem por Locutor\n" + timeline_md
-        
-        # Generate structured minutes
+        # Generate structured minutes (sem a transcrição completa)
         print("Gerando ata estruturada...")
         structured_minutes = generate_structured_minutes(transcription)
-        if timeline_md:
-            structured_minutes += timeline_md
         
         # Save to database
         db_minute = models.Minute(
@@ -135,13 +204,19 @@ async def create_minute(
             original_filename=file.filename,
             file_size=file_size,
             audio_duration=duration,
-            transcription=transcription,
+            transcription=transcription_display,  # Usar a versão com timestamps
             structured_minutes=structured_minutes,
             processing_time=processing_time
         )
         db.add(db_minute)
         db.commit()
         db.refresh(db_minute)
+        
+        # Transferir progresso do ID temporário para o ID real
+        if temp_progress_id in upload_progress:
+            upload_progress[db_minute.id] = upload_progress[temp_progress_id]
+            del upload_progress[temp_progress_id]
+        
         print(f"Ata salva no banco: ID {db_minute.id}")
         
         # Cleanup
@@ -246,6 +321,30 @@ def delete_minute(
         raise HTTPException(status_code=404, detail="Minute not found")
     
     db.delete(minute)
+    db.commit()
+    return {"message": "Minute deleted successfully"}
+
+
+@router.get("/progress/{minute_id}")
+def get_upload_progress(
+    minute_id: int,
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """Obter progresso de transcrição em tempo real para um minuto"""
+    if minute_id not in upload_progress:
+        return {
+            "frames_done": 0,
+            "frames_total": 0,
+            "percent": 0,
+            "fps": 0,
+            "elapsed": "00:00",
+            "remaining": "...",
+            "status": "waiting"
+        }
+    
+    return upload_progress.get(minute_id, {
+        "status": "processing"
+    })
     db.commit()
     
     return {"message": "Minute deleted successfully"}

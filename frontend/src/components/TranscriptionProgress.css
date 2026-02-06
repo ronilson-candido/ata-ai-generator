@@ -1,0 +1,96 @@
+/* Estilos para card de progresso da transcrição em tempo real */
+
+.transcription-progress-card {
+  background: linear-gradient(135deg, #f0f7ff 0%, #e3f2fd 100%);
+  border: 2px solid #1976d2;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 20px 0;
+  box-shadow: 0 2px 8px rgba(25, 118, 210, 0.15);
+}
+
+.transcription-progress-card h4 {
+  font-size: 16px;
+  color: #1976d2;
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.progress-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.stat {
+  background: #ffffff;
+  border: 1px solid #bbdefb;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat .label {
+  font-size: 12px;
+  color: #666666;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.stat .value {
+  font-size: 16px;
+  color: #1976d2;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+
+@media (max-width: 768px) {
+  .progress-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .transcription-progress-card {
+    padding: 16px;
+  }
+  
+  .stat {
+    padding: 10px;
+  }
+  
+  .stat .value {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .progress-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .stat .label {
+    font-size: 11px;
+  }
+  
+  .stat .value {
+    font-size: 13px;
+  }
+}
+
+/* Animação de pulsação para card ativo */
+@keyframes pulse-blue {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.15);
+  }
+  50% {
+    box-shadow: 0 2px 16px rgba(25, 118, 210, 0.3);
+  }
+}
+
+.transcription-progress-card {
+  animation: pulse-blue 3s ease-in-out infinite;
+}

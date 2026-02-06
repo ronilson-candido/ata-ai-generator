@@ -5,6 +5,14 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     ffmpeg \
+    libavcodec-dev \
+    libavformat-dev \
+    libavutil-dev \
+    libswscale-dev \
+    libavfilter-dev \
+    libavdevice-dev \
+    pkg-config \
+    git \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
@@ -23,4 +31,4 @@ COPY . .
 EXPOSE 8000
 
 # Run FastAPI
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
